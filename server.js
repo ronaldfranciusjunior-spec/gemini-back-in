@@ -5,13 +5,9 @@ import { GoogleGenAI } from "@google/genai";
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// ---------------------------------------------------------
 // IMPORTANT: this must be set in Render → Environment tab
 // as GEMINI_API_KEY, with a key generated at
-// https://aistudio.google.com/apikey (NOT a Google Cloud
-// OAuth client ID — that's what causes
-// ACCESS_TOKEN_TYPE_UNSUPPORTED).
-// ---------------------------------------------------------
+// https://aistudio.google.com/apikey
 const apiKey = process.env.GEMINI_API_KEY;
 
 if (!apiKey) {
@@ -43,7 +39,7 @@ app.post("/generate", async (req, res) => {
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-3.6-flash",
       contents: [
         {
           role: "user",
