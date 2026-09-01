@@ -5,6 +5,13 @@ import { GoogleGenAI } from "@google/genai";
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+// ---------------------------------------------------------
+// IMPORTANT: this must be set in Render → Environment tab
+// as GEMINI_API_KEY, with a key generated at
+// https://aistudio.google.com/apikey (NOT a Google Cloud
+// OAuth client ID — that's what causes
+// ACCESS_TOKEN_TYPE_UNSUPPORTED).
+// ---------------------------------------------------------
 const apiKey = process.env.GEMINI_API_KEY;
 
 if (!apiKey) {
@@ -48,10 +55,18 @@ app.post("/generate", async (req, res) => {
               {
                 text:
                   "You are a study assistant. Turn the following raw " +
-                  "lecture transcript into clean, organized study notes " +
-                  "with headings and bullet points. Fix obvious speech-" +
-                  "to-text errors where the meaning is clear, but do not " +
-                  "invent content that wasn't said.\n\nTranscript:\n" +
+                  "lecture transcript into clean, organized study notes.\n\n" +
+                  "Formatting rules (follow exactly):\n" +
+                  "- Do NOT use Markdown symbols of any kind: no #, ##, " +
+                  "**, *, or _.\n" +
+                  "- Write section titles as plain text in ALL CAPS on " +
+                  "their own line.\n" +
+                  "- Use a simple dash and space (\"- \") for bullet " +
+                  "points, nothing else.\n" +
+                  "- Leave a blank line between sections.\n" +
+                  "- Fix obvious speech-to-text errors where the meaning " +
+                  "is clear, but do not invent content that wasn't said." +
+                  "\n\nTranscript:\n" +
                   prompt
               }
             ]
