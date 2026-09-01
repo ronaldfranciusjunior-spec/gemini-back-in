@@ -5,9 +5,6 @@ import { GoogleGenAI } from "@google/genai";
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// IMPORTANT: this must be set in Render → Environment tab
-// as GEMINI_API_KEY, with a key generated at
-// https://aistudio.google.com/apikey
 const apiKey = process.env.GEMINI_API_KEY;
 
 if (!apiKey) {
@@ -37,46 +34,80 @@ app.post("/generate", async (req, res) => {
     });
   }
 
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text:
-                "You are a study assistant. Turn the following raw " +
-                "lecture transcript into clean, organized study notes " +
-                "with headings and bullet points. Fix obvious speech-" +
-                "to-text errors where the meaning is clear, but do not " +
-                "invent content that wasn't said.\n\nTranscript:\n" +
-                prompt
-            }
-          ]
-        }
-      ]
-    });
+  const MAX_ATTEMPTS = 3;
+  let lastError = null;
 
-    const text = response?.text
-      ?? response?.candidates?.[0]?.content?.parts?.[0]?.text
-      ?? "";
-
-    if (!text) {
-      console.error("Gemini returned no text:", JSON.stringify(response));
-      return res.status(502).json({
-        error: "Gemini returned an empty response."
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3.6-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text:
+                  "You are a study assistant. Turn the following raw " +
+                  "lecture transcript into clean, organized study notes " +
+                  "with headings and bullet points. Fix obvious speech-" +
+                  "to-text errors where the meaning is clear, but do not " +
+                  "invent content that wasn't said.\n\nTranscript:\n" +
+                  prompt
+              }
+            ]
+          }
+        ]
       });
-    }
 
-    res.json({ text });
-  } catch (error) {
-    console.error("Gemini API error:", error);
-    res.status(500).json({
-      error: "Failed to generate notes.",
-      detail: error?.message || String(error)
+      const text = response?.text
+        ?? response?.candidates?.[0]?.content?.parts?.[0]?.text
+        ?? "";
+
+      if (!text) {
+        console.error("Gemini returned no text:", JSON.stringify(response));
+        return res.status(502).json({
+          error: "Gemini returned an empty response."
+        });
+      }
+
+      return res.json({ text });
+    } catch (error) {
+      lastError = error;
+
+      const isOverloaded =
+        error?.status === 503 ||
+        error?.status === "UNAVAILABLE" ||
+        /UNAVAILABLE|overloaded|high demand/i.test(error?.message || "");
+
+      console.error(
+        `Gemini API error (attempt ${attempt}/${MAX_ATTEMPTS}):`,
+        error
+      );
+
+      if (isOverloaded && attempt < MAX_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, attempt * 1000));
+        continue;
+      }
+
+      break;
+    }
+  }
+
+  const wasOverloaded =
+    lastError?.status === 503 ||
+    lastError?.status === "UNAVAILABLE" ||
+    /UNAVAILABLE|overloaded|high demand/i.test(lastError?.message || "");
+
+  if (wasOverloaded) {
+    return res.status(503).json({
+      error: "Gemini is busy right now. Please try again in a minute."
     });
   }
+
+  res.status(500).json({
+    error: "Failed to generate notes.",
+    detail: lastError?.message || String(lastError)
+  });
 });
 
 app.get("/", (req, res) => {
