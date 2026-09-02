@@ -36,8 +36,8 @@ app.post("/generate", async (req, res) => {
 
   const MODELS = [
     "gemini-3.6-flash",
-    "gemini-2.5-flash",
-    "gemini-flash-latest"
+    "gemini-flash-latest",
+    "gemini-pro-latest"
   ];
   const ATTEMPTS_PER_MODEL = 2;
   let lastError = null;
@@ -99,12 +99,17 @@ app.post("/generate", async (req, res) => {
           error?.status === "RESOURCE_EXHAUSTED" ||
           /RESOURCE_EXHAUSTED|quota|rate.?limit/i.test(error?.message || "");
 
+        const isModelUnavailable =
+          error?.status === 404 ||
+          error?.status === "NOT_FOUND" ||
+          /NOT_FOUND|no longer available|is not found/i.test(error?.message || "");
+
         console.error(
           `Gemini API error [model: ${model}, attempt ${attempt}/${ATTEMPTS_PER_MODEL}]:`,
           error
         );
 
-        if (isQuotaExceeded) {
+        if (isQuotaExceeded || isModelUnavailable) {
           continue outer;
         }
 
